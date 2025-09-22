@@ -237,7 +237,7 @@ label{
 
   <div class="container">
     <h1>VOJ8 / CDS — Generador</h1>
-    <p class="muted">Solo 4 bloques (PT+ES/中文). Ayer/Hoy y las cantidades deben reflejarse al instante.</p>
+    <p class="muted">Solo 4 bloques (PT+ES/中文). Ayer/Hoy.</p>
 
     <div class="card"><div class="content">
       <label>Fecha</label>
@@ -301,7 +301,11 @@ const horarios=[
 
 /* ===== Util ===== */
 const pad2 = n => String(Math.max(0, parseInt(n||0,10))).padStart(2,'0');
-const fmtEs = d => `${d.getDate()} de ${mesesEs[d.getMonth()]}`;
+const fmtEs = d => {
+    const isToday = d.getTime() === today0().getTime();
+    const isYesterday = d.getTime() === today0().getTime() - 86400000;
+    return `${d.getDate()} de ${mesesEs[d.getMonth()]} ${isToday ? '(Hoy)' : isYesterday ? '(Ayer)' : ''}`;
+};
 const fmtZh = d => `${mesesZh[d.getMonth()]}月 ${d.getDate()} 日`; // 一月 1 日
 function today0(){ const n=new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
 function currentDate(){ const d=today0(); if(useYesterday) d.setDate(d.getDate()-1); return d; }
