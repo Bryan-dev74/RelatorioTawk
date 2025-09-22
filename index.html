@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VOJ8/CDS — Generador (Single File)</title>
+<meta name="color-scheme" content="dark" />
+<link rel="icon" type="image/x-icon" href="favicon.ico" />
+<style>
+/* ====== Tema base ====== */
+:root{
+  --bg:#070709; --text:#e9e9ee; --muted:#a8acb3; --border:#23252c; --panel:#0f1015;
+  --accent-1:#68e1ff; --accent-2:#7b5cff; --accent-3:#ff3f8e;
+  --ring: rgba(120, 120, 255, .55);
+  --radius: 16px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+
+body{
+  margin:0; color:var(--text);
+  font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+  position:relative; overflow-x:hidden;
+  background: var(--bg);
+  /* Fondo animado “Aurora” */
+  --bgx1: 10%; --bgy1: -10%; --bgx2: 120%; --bgy2: 120%;
+  background-image:
+    radial-gradient(1200px 1200px at var(--bgx1) var(--bgy1), #151622 0%, transparent 55%),
+    radial-gradient(1000px 1000px at var(--bgx2) var(--bgy2), #0d0f19 0%, transparent 60%);
+  animation: bg-pan 38s linear infinite;
+}
+
+/* Capas extra del fondo (blobs + grid suave) */
+body::before, body::after{
+  content:"";
+  position:fixed; inset:-20% -10%;
+  filter: blur(80px);
+  z-index:-2; pointer-events:none;
+  background:
+    radial-gradient(40% 35% at 20% 30%, rgba(124,244,255,.25), transparent 60%),
+    radial-gradient(35% 45% at 80% 70%, rgba(123,92,255,.22), transparent 60%),
+    radial-gradient(30% 35% at 50% 10%, rgba(255,63,142,.18), transparent 60%);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+body::after{
+  animation: drift2 34s ease-in-out infinite alternate-reverse;
+  opacity:.85;
+}
+
+@keyframes bg-pan{
+  0%{ --bgx1:10%; --bgy1:-10%; --bgx2:120%; --bgy2:120%; }
+  50%{ --bgx1:30%; --bgy1:12%;  --bgx2:105%; --bgy2:105%; }
+  100%{ --bgx1:10%; --bgy1:-10%; --bgx2:120%; --bgy2:120%; }
+}
+@keyframes drift{
+  0%{ transform: translate3d(-2%, -1%, 0) rotate(0deg) scale(1); }
+  100%{ transform: translate3d(2%, 1%, 0) rotate(8deg) scale(1.08); }
+}
+@keyframes drift2{
+  0%{ transform: translate3d(1%, 2%, 0) rotate(-4deg) scale(1.02); }
+  100%{ transform: translate3d(-1%, -2%, 0) rotate(6deg) scale(1.1); }
+}
+
+/* Lluvia de luz sutil (líneas) */
+.bg-lines{
+  position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.07;
+  background:
+    repeating-linear-gradient( to right, #fff, #fff 1px, transparent 1px, transparent 40px ),
+    repeating-linear-gradient( to bottom, #fff, #fff 1px, transparent 1px, transparent 40px );
+  transform: translateZ(0);
+  animation: gridMove 20s linear infinite;
+}
+@keyframes gridMove{
+  from{ transform: translate3d(0,0,0); }
+  to{ transform: translate3d(-40px,-40px,0); }
+}
+
+/* Respeta usuarios con reducción de movimiento */
+@media (prefers-reduced-motion: reduce){
+  body, body::before, body::after, .bg-lines { animation: none !important; }
+}
+
+/* ====== Layout ====== */
+.container{max-width:980px;margin:0 auto;padding:28px}
+h1{
+  margin: 0 0 6px;
+  font-size: clamp(22px, 3.6vw, 32px);
+  line-height:1.15; letter-spacing:.2px;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2) 40%, var(--accent-3));
+  -webkit-background-clip: text; background-clip:text; color: transparent;
+  text-shadow: 0 0 24px rgba(123,92,255,.25);
+}
+.muted{color:var(--muted);font-size:12px}
+
+/* ====== Tarjetas glass ====== */
+.card{
+  position:relative; overflow:hidden; margin: 14px 0;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(18,19,26,.76), rgba(12,13,18,.76));
+  border: 1px solid rgba(140,150,180,.18);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03);
+  backdrop-filter: saturate(160%) blur(14px);
+}
+.card::before{
+  content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
+  background: conic-gradient(from 180deg at 50% 50%, rgba(124,244,255,.22), rgba(123,92,255,.22), rgba(255,63,142,.22), rgba(124,244,255,.22));
+  filter: blur(28px); opacity:.18;
+}
+.card .content{padding:16px 16px 18px}
+
+/* ====== Filas / Inputs ====== */
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.input{
+  width:120px; max-width:140px;
+  background:#0b0d13; color:var(--text);
+  border:1px solid rgba(140,150,180,.22);
+  border-radius:12px; padding:10px 12px; font-weight:600;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.02), 0 6px 14px rgba(0,0,0,.25);
+  transition: border-color .2s, box-shadow .2s, transform .12s;
+  outline: none;
+}
+.input:focus{
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 4px var(--ring), inset 0 0 0 1px rgba(255,255,255,.04);
+}
+.input[type=number]{ -moz-appearance:textfield; }
+.input::-webkit-outer-spin-button,
+.input::-webkit-inner-spin-button{ -webkit-appearance: none; margin:0; }
+
+/* ====== Botones ====== */
+.btn{
+  --btn-bg: linear-gradient(180deg, #181a22, #12141b);
+  --btn-br: rgba(140,150,180,.26);
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--btn-br); background: var(--btn-bg); color:var(--text);
+  border-radius:12px; padding:10px 14px; cursor:pointer; user-select:none;
+  box-shadow: 0 6px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03);
+  transition: transform .12s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+  overflow:hidden;
+}
+.btn:hover{ transform: translateY(-1px); box-shadow: 0 10px 22px rgba(0,0,0,.45); }
+.btn:active{ transform: translateY(0); box-shadow: 0 6px 14px rgba(0,0,0,.35); }
+.btn:focus-visible{ outline:none; box-shadow: 0 0 0 4px var(--ring); border-color: var(--accent-2); }
+.btn.light{
+  --btn-bg: linear-gradient(180deg, #f7f7fb, #e9e9f3);
+  --btn-br: rgba(200,205,230,.9);
+  color:#0b0c10; font-weight:700;
+}
+
+/* Ripple (por JS: agrega/clase .ripple momentáneamente) */
+.btn::after, .seg button::after{
+  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background: radial-gradient(120px 120px at var(--x,50%) var(--y,50%), rgba(255,255,255,.16), transparent 60%);
+  opacity:0; transform: scale(.6);
+}
+.btn.ripple::after, .seg button.ripple::after{
+  animation: ripple .5s ease forwards;
+}
+@keyframes ripple{
+  from{opacity:.5; transform:scale(.6)}
+  to{opacity:0; transform:scale(2.2)}
+}
+
+/* Botones step ( + / - ) */
+.step{
+  min-width:40px; height:40px; border-radius:12px;
+  font-size:18px; font-weight:700; line-height:1;
+}
+
+/* ====== Segmented control ====== */
+.seg{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:8px;
+}
+.seg button{
+  position:relative;
+  border:1px solid rgba(140,150,180,.25);
+  background: linear-gradient(180deg, #0f1117, #0c0e13);
+  color:#d8dbe6; border-radius:12px; padding:10px 12px; cursor:pointer; font-weight:600;
+  box-shadow: 0 6px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03);
+  transition: transform .12s, border-color .2s, box-shadow .2s, background .2s;
+}
+.seg button:hover{ transform: translateY(-1px); }
+.seg button[aria-current="true"]{
+  background: linear-gradient(135deg, rgba(124,244,255,.18), rgba(123,92,255,.18) 60%, rgba(255,63,142,.18));
+  border-color: rgba(140,150,255,.5);
+  box-shadow: 0 10px 24px rgba(123,92,255,.25);
+  color:#fff;
+}
+
+/* ====== Output ====== */
+pre{
+  white-space:pre-wrap; font: 600 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  background:#090b11; border:1px solid rgba(140,150,180,.22); padding:16px; border-radius:14px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), 0 10px 20px rgba(0,0,0,.35);
+  position:relative;
+}
+pre::before{
+  content:""; position:absolute; inset:-1px; border-radius: inherit; pointer-events:none;
+  background: linear-gradient(90deg, rgba(124,244,255,.15), rgba(123,92,255,.15) 40%, rgba(255,63,142,.15));
+  filter: blur(20px); opacity:.25;
+}
+
+/* ====== Chips / labels ====== */
+label{
+  display:inline-block; font-weight:700; letter-spacing:.25px; margin-bottom:8px;
+  color:#eaeaef;
+}
+
+/* ====== Toast ====== */
+#toast{
+  position: fixed; right:16px; bottom:16px;
+  background: linear-gradient(180deg, #12131a, #0c0d13);
+  border:1px solid rgba(140,150,180,.25);
+  color:#e9e9ee; padding:10px 12px; border-radius:12px; box-shadow: 0 8px 18px rgba(0,0,0,.45);
+  opacity:0; transform: translateY(8px); pointer-events:none; z-index:10;
+  transition: opacity .25s ease, transform .25s ease;
+}
+#toast.show{ opacity:1; transform: translateY(0); }
+
+/* ====== Util ====== */
+.hr{
+  height:1px; background:linear-gradient(90deg, transparent, rgba(255,255,255,.1), transparent);
+  margin:10px 0 0;
+}
+
+/* ====== Responsivo ====== */
+@media (max-width:640px){
+  .seg{ grid-template-columns:1fr 1fr; }
+  .input{ width:110px; }
+}
+</style>
+</head>
+<body>
+  <!-- líneas del fondo -->
+  <div class="bg-lines" aria-hidden="true"></div>
+
+  <div class="container">
+    <h1>VOJ8 / CDS — Generador</h1>
+    <p class="muted">Solo 4 bloques (PT+ES/中文). Ayer/Hoy y las cantidades deben reflejarse al instante.</p>
+
+    <div class="card"><div class="content">
+      <label>Fecha</label>
+      <div class="row">
+        <button class="btn" id="btnHoy" onclick="setDia(false)">Hoy</button>
+        <button class="btn" id="btnAyer" onclick="setDia(true)">Ayer</button>
+        <div class="muted" id="fechaSel" aria-live="polite"></div>
+      </div>
+    </div></div>
+
+    <div class="card"><div class="content">
+      <label>Horario</label>
+      <div class="seg">
+        <button data-idx="0" onclick="setHorario(0)">18:00 - 00:00</button>
+        <button data-idx="1" onclick="setHorario(1)">00:00 - 06:00</button>
+        <button data-idx="2" onclick="setHorario(2)">06:00 - 12:00</button>
+        <button data-idx="3" onclick="setHorario(3)" aria-current="true">13:00 - 18:00</button>
+      </div>
+      <div class="muted" style="margin-top:6px">Actual: <span id="horarioTxt">13:00 - 18:00</span></div>
+    </div></div>
+
+    <div class="card"><div class="content">
+      <label>Cantidades</label>
+      <div class="row" style="align-items:center">
+        <span>VOJ8:</span>
+        <button class="btn step" onclick="inc('voj8',-1)">-</button>
+        <input id="voj8" class="input" type="number" min="0" value="6" oninput="sanitize(this);render()">
+        <button class="btn step" onclick="inc('voj8',1)">+</button>
+
+        <span style="margin-left:20px">CDS:</span>
+        <button class="btn step" onclick="inc('cds',-1)">-</button>
+        <input id="cds" class="input" type="number" min="0" value="3" oninput="sanitize(this);render()">
+        <button class="btn step" onclick="inc('cds',1)">+</button>
+      </div>
+    </div></div>
+
+    <div class="card"><div class="content">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="muted">Mensaje</div>
+        <button class="btn light" onclick="copiar()">Copiar</button>
+      </div>
+      <pre id="out" aria-live="polite"></pre>
+      <div class="hr"></div>
+    </div></div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite">Copiado ✓</div>
+
+<script>
+/* ===== Estado ===== */
+const mesesEs=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const mesesZh=["一","二","三","四","五","六","七","八","九","十","十一","十二"]; // para 一月、二月…十二月
+let useYesterday = false;
+let horarioIdx = 0; // por defecto 18:00-00:00
+const horarios=[
+  {ini:"18:00", fin:"00:00"},
+  {ini:"00:00", fin:"06:00"},
+  {ini:"06:00", fin:"12:00"},
+  {ini:"13:00", fin:"18:00"},
+];
+
+/* ===== Util ===== */
+const pad2 = n => String(Math.max(0, parseInt(n||0,10))).padStart(2,'0');
+const fmtEs = d => `${d.getDate()} de ${mesesEs[d.getMonth()]}`;
+const fmtZh = d => `${mesesZh[d.getMonth()]}月 ${d.getDate()} 日`; // 一月 1 日
+function today0(){ const n=new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+function currentDate(){ const d=today0(); if(useYesterday) d.setDate(d.getDate()-1); return d; }
+
+/* ===== UI helpers (ripple + toast) ===== */
+function bindRipples(){
+  document.addEventListener('pointerdown', (e)=>{
+    const t = e.target.closest('.btn, .seg button');
+    if(!t) return;
+    const r = t.getBoundingClientRect();
+    t.style.setProperty('--x', (e.clientX - r.left) + 'px');
+    t.style.setProperty('--y', (e.clientY - r.top) + 'px');
+    t.classList.add('ripple');
+    setTimeout(()=>t.classList.remove('ripple'), 500);
+  });
+}
+function showToast(msg="Copiado ✓"){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> el.classList.remove('show'), 1400);
+}
+
+/* ===== Interfaz ===== */
+function setDia(ayer){
+  useYesterday = !!ayer;
+  try{ localStorage.setItem('useYesterday', JSON.stringify(useYesterday)); }catch(_){}
+  document.getElementById('btnHoy').classList.toggle('light', !useYesterday);
+  document.getElementById('btnAyer').classList.toggle('light', useYesterday);
+  document.getElementById('fechaSel').textContent = "Seleccionado: " + fmtEs(currentDate());
+  render();
+}
+function setHorario(idx){
+  horarioIdx = idx;
+  try{ localStorage.setItem('horarioIdx', String(idx)); }catch(_){}
+  document.getElementById('horarioTxt').textContent = `${horarios[idx].ini} - ${horarios[idx].fin}`;
+  document.querySelectorAll('.seg button').forEach((b,i)=>{
+    if(i===idx) b.setAttribute('aria-current','true'); else b.removeAttribute('aria-current');
+  });
+  render();
+}
+function sanitize(el){
+  let v = parseInt(el.value,10);
+  if(!Number.isFinite(v) || v<0) v = 0;
+  el.value = String(v);
+}
+function inc(id,delta){
+  const el = document.getElementById(id);
+  sanitize(el);
+  el.value = String(Math.max(0, parseInt(el.value,10) + delta));
+  render();
+}
+function copiar(){
+  const text = document.getElementById('out').textContent || "";
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text)
+      .then(()=>showToast("Copiado ✓"))
+      .catch(()=>{ fallbackCopy(text); showToast("Copiado ✓"); });
+  }else{
+    fallbackCopy(text); showToast("Copiado ✓");
+  }
+}
+function fallbackCopy(t){
+  const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta);
+  ta.select(); document.execCommand('copy'); ta.remove();
+}
+
+/* ===== Generador EXACTO (solo 4 bloques) ===== */
+function render(){
+  const d = currentDate();
+  const fEs = fmtEs(d);
+  const zh = fmtZh(d);
+  const {ini, fin} = horarios[horarioIdx];
+
+  const voj8Count = pad2(document.getElementById('voj8').value);
+  const cdsCount  = pad2(document.getElementById('cds').value);
+
+  const b1 =
+`Relatório VOJ8 - Período: ${fEs} desde las ${ini} hasta las ${fin} horas
+Total de Mensajes Recibidas: ${voj8Count}
+Sin casos especiales 
+Sin pendientes`;
+
+  const b2 =
+`報告 VOJ8 - 時段：${zh} ${ini} 至 ${fin} 時段
+收到的訊息總數：${voj8Count}
+沒有特殊情況 
+無待處理`;
+
+  const b3 =
+`Relatório CDS - Período: ${fEs} desde las ${ini} hasta las ${fin} horas
+Total de Mensajes Recibidas: ${cdsCount}
+Sin casos especiales 
+Sin pendientes`;
+
+  const b4 =
+`CDS 報告 - 期間：${zh} ${ini} 至 ${fin} 小時
+收到的訊息總數：${cdsCount}
+無特殊個案 
+無待處理`;
+
+  document.getElementById('out').textContent = [b1,b2,b3,b4].join("\n\n");
+}
+
+/* ===== Init ===== */
+(function init(){
+  // Mantener horario previo si existe
+  try{
+    const v = parseInt(localStorage.getItem('horarioIdx'),10);
+    if(Number.isFinite(v)&&v>=0&&v<horarios.length) horarioIdx=v;
+  }catch(_){}
+
+  // Forzar SIEMPRE "Hoy" al cargar
+  useYesterday = false;
+  try{ localStorage.setItem('useYesterday','false'); }catch(_){}
+
+  bindRipples();
+  setHorario(horarioIdx);  // pinta el UI del horario y renderiza
+  setDia(false);           // selecciona "Hoy" y vuelve a renderizar
+})();
+</script>
+</body>
+</html>
